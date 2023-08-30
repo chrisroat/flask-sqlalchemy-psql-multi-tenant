@@ -1,0 +1,5 @@
+flask
+flask-migrate
+flask-sqlalchemy
+sqlalchemy-utils
+psycopg2  # Postgres backend
