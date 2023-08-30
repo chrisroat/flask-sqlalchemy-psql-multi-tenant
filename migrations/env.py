@@ -2,6 +2,7 @@ import logging
 from logging.config import fileConfig
 
 from flask import current_app
+from sqlalchemy import inspect, text
 
 from alembic import context
 
@@ -80,28 +81,32 @@ def run_migrations_online():
 
     """
 
-    # this callback is used to prevent an auto-migration from being generated
-    # when there are no changes to the schema
-    # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
-    def process_revision_directives(context, revision, directives):
-        if getattr(config.cmd_opts, 'autogenerate', False):
-            script = directives[0]
-            if script.upgrade_ops.is_empty():
-                directives[:] = []
-                logger.info('No changes in schema detected.')
-
     connectable = get_engine()
+    inspector = inspect(connectable)
+    schemas = [schema for schema in inspector.get_schema_names() 
+               if schema not in {"information_schema", "public"}]
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection,
-            target_metadata=get_metadata(),
-            process_revision_directives=process_revision_directives,
-            **current_app.extensions['migrate'].configure_args
-        )
+        for schema in schemas:
+            conn = connection.execution_options(schema_translate_map={"per_user": schema})
+            conn.execute(text(f"SET search_path TO {schema}"))
+            conn.commit()
+            
+            conn.dialect.default_schema_name = schema
+            
+            def include_object(object, name, type_, reflected, compare_to):
+                return type_ == "table" and object.schema != "per_user"
 
-        with context.begin_transaction():
-            context.run_migrations()
+            context.configure(
+                connection=conn, 
+                target_metadata=target_db.metadatas['per_user'],
+                # include_object=include_object,
+                include_schemas=True,
+                **current_app.extensions['migrate'].configure_args
+            )
+
+            with context.begin_transaction():
+                context.run_migrations()
 
 
 if context.is_offline_mode():

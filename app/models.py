@@ -26,6 +26,7 @@ class Data(db.Model):
 
     key = db.Column(db.Integer, primary_key=True)
     value = db.Column(db.Integer)
+    value2 = db.Column(db.Integer)
 
 
 def _init_db():
