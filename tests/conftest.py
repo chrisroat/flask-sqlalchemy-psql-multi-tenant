@@ -32,11 +32,13 @@ def test_db_uri(request: type[pytest.FixtureRequest]):
 def app(test_db_uri: str):
     """Configure Flask app for testing."""
 
-    # Update default URI
+    # Update default and bound database URIs
     TestConfig.SQLALCHEMY_DATABASE_URI = test_db_uri
+    for k in TestConfig.SQLALCHEMY_BINDS:
+        TestConfig.SQLALCHEMY_BINDS[k] = test_db_uri
 
     app = create_app(TestConfig)
     with app.app_context():
-        db.create_all()
+        db.create_all(bind_key="global")
 
     return app
